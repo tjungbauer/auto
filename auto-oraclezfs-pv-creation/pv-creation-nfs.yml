@@ -1,0 +1,113 @@
+---
+# This playbook shall give an example on how to automatically create a
+# filesystem + quota at the OracleZFS and create the PV at one of the masters.
+# Currently the master node is preselected.
+# The PVC must be created manually during the project onboarding.
+#
+# As only 2 commands are used, no role concept was added to this playbook.
+#
+# Execution:
+#    pv-creation-nfs.yml -i [sandbox|test|production] -e "quota_gb=1" [-vvv]
+#
+#    Input variable is quota in Gigabyte (1,2,3...)
+#
+# VAULT: Ansible Vault is currently NOT active.
+# It can and should be activated latest before going to production
+#
+# Author: tjungbauer@redhat.com
+# Date: 18.02.2019
+#
+- hosts: localhost
+  gather_facts: false
+  connection: local # running OracleZFS API call on localhost
+  tasks:
+    # GET all filesystem of the ZFS, by calling the API. Return code must be 200.
+    # This is used to fetch the latest share name and calculate the next one.
+    # Nameconvention: share-01,02,03...12,13,14...
+    - name: "Get all filesystems of Oracle ZFS"
+      uri:
+        url: "{{ oraclezfs_url }}/api/storage/v1/pools/{{ oraclezfs_poolname }}/projects/{{ oraclezfs_projname }}/filesystems"
+        method: GET
+        status_code: 200
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+          X-Auth-User: "{{ oraclezfs_user }}"
+          X-Auth-Key: "{{ oraclezfs_key }}"
+        validate_certs: false
+        return_content: true
+      register: result
+
+    # remember the last returned array
+    - name: "Store last share array"
+      set_fact:
+        last_share: "{{ result.json.filesystems|last }}"
+      register: last_share
+
+    # recalculate the next share ID, by incrementing with 1. If array was empty, then next number is 1
+    - name: "Get NEXT share ID"
+      set_fact:
+        last_share_name: "{{ last_share.name.split('-')[1]|int+1 if last_share.name|length > 0 else '1' }}"
+      register: last_share_name
+
+    # put together and get the next sharename
+    - name: "Get NEXT sharename"
+      set_fact:
+        next_share_name: "{{ 'share-0'+last_share_name if last_share_name < 10 else 'share-'+last_share_name }}"
+      register: next_share_name
+
+    # Create the filesystem at the OracleZFS. Return code is 201
+    # user, group, permissions: preselected.
+    # sharename: created dynamically
+    # quota: given at playbook execution.
+    - name: "Create a new filesystem at Oracle ZFS"
+      uri:
+        url: "{{ oraclezfs_url }}/api/storage/v1/pools/{{ oraclezfs_poolname }}/projects/{{ oraclezfs_projname }}/filesystems"
+        method: POST
+        body_format: json
+        body: '
+          {"name": "{{ next_share_name }}",
+           "root_user": "nobody",
+           "root_group": "root",
+           "root_permissions": "770",
+           "quota": "{{ quota_gib }}"
+         }'
+        status_code: 201
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+          X-Auth-User: "{{ oraclezfs_user }}"
+          X-Auth-Key: "{{ oraclezfs_key }}"
+        validate_certs: false
+        return_content: true
+      register: result
+
+    - debug:
+        msg: "Filesystem {{ next_share_name }} created with quota {{ quota_gib }}"
+
+    # use the template templates/persistent-volume.yml.j2 to create and push a yaml file onto the master node
+    - name: "Create PersistentVolume definition"
+      template:
+        dest: "{{ 'PV-'+next_share_name+'.yml' }}"
+        src: templates/persistent-volume.yml.j2
+      when: result | length > 0
+      changed_when: False
+      delegate_to: "{{ master }}"
+
+    # use "oc" command to create the actual PV in Openshift
+    - name: "Create PersistentVolumes"
+      become: true
+      become_user: root
+      become_method: sudo
+      command: >
+        oc create
+        -f "{{ 'PV-'+next_share_name+'.yml' }}"
+        --config=/etc/origin/master/admin.kubeconfig
+      register: pv_create_output
+      when: result | length > 0
+      failed_when: "('already exists' not in pv_create_output.stderr) and ('created' not in pv_create_output.stdout) and pv_create_output.rc != 0"
+      changed_when: ('created' in pv_create_output.stdout)
+      delegate_to: "{{ master }}"
+
+    - debug:
+        msg: "PV {{ next_share_name }} has been created"
