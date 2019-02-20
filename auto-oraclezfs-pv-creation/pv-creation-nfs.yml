@@ -7,9 +7,7 @@
 # As only 2 commands are used, no role concept was added to this playbook.
 #
 # Execution:
-#    pv-creation-nfs.yml -i [sandbox|test|production] -e "quota_gb=1" [-vvv]
-#
-#    Input variable is quota in Gigabyte (1,2,3...)
+#    pv-creation-nfs.yml -i [sandbox|test|production] [-vvv]
 #
 # VAULT: Ansible Vault is currently NOT active.
 # It can and should be activated latest before going to production
@@ -20,6 +18,11 @@
 - hosts: localhost
   gather_facts: false
   connection: local # running OracleZFS API call on localhost
+  vars_prompt:
+    name: "quota_gb"
+    prompt: "Enter your desired quota in GB:"
+    default: "1"
+    private: no
   tasks:
     # GET all filesystem of the ZFS, by calling the API. Return code must be 200.
     # This is used to fetch the latest share name and calculate the next one.
