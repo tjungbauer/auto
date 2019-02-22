@@ -6,11 +6,14 @@
 #
 # As only 2 commands are used, no role concept was added to this playbook.
 #
-# Execution:
-#    pv-creation-nfs.yml -i [sandbox|test|production] [-vvv]
+# Before you begin:
+#   1. generate a vault-password
+#   2. put the generated vault password into the file .vault_pass.txt and chmod it to 600
+#   3. encrypt your password
+#         ansible-vault encrypt_string --vault-password-file .vault_pass.txt <PASSWORDSTRING>
 #
-# VAULT: Ansible Vault is currently NOT active.
-# It can and should be activated latest before going to production
+# Execution:
+#    pv-creation-nfs.yml -i [sandbox|test|production] --vault-password-file .vault_pass.txt [-vvv]
 #
 # Author: tjungbauer@redhat.com
 # Date: 18.02.2019

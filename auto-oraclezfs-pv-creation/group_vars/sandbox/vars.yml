@@ -1,6 +1,6 @@
 ---
 oraclezfs_host:
 oraclezfs_user:
-oraclezfs_key:
+oraclezfs_key: !vault | ...
 oraclezfs_poolname:
 oraclezfs_projname:
