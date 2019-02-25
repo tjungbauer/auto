@@ -4,3 +4,4 @@ oraclezfs_user:
 oraclezfs_key: !vault | ...
 oraclezfs_poolname:
 oraclezfs_projname:
+master:
