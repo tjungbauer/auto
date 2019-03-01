@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ next_share_name }}-pv
+  labels:
+    storage: preprovisioned-pv
+    pvname: {{ next_share_name }}
+spec:
+  capacity:
+    storage: {{ quota_gb }}Gi
+  accessModes:
+  - ReadWriteMany
+  nfs:
+    path: /export/{{ next_share_name }}
+    server: {{ oraclezfs_host }}
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: ''
