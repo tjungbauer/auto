@@ -1,15 +1,15 @@
 ---
 # This playbook shall give an example on how to automatically create a
 # filesystem + quota at the OracleZFS and create the PV at one of the masters.
-# Currently the master node is preselected.
+# Currently the master node is preselected. 
 # The PVC must be created manually during the project onboarding.
 #
 # As only 2 commands are used, no role concept was added to this playbook.
 #
 # Before you begin:
-#   1. generate a vault-password
-#   2. put the generated vault password into the file .vault_pass.txt and chmod it to 600
-#   3. encrypt your password
+#   1. generate a Vault-Password
+#   2. put the generated vault password into .vault_pass.txt file and chmod it to 600
+#   3. encrypt your password 
 #         ansible-vault encrypt_string --vault-password-file .vault_pass.txt <PASSWORDSTRING>
 #
 # Execution:
@@ -17,7 +17,7 @@
 #
 # Author: tjungbauer@redhat.com
 # Date: 18.02.2019
-#
+# 
 - hosts: localhost
   gather_facts: false
   connection: local # running OracleZFS API call on localhost
@@ -27,7 +27,7 @@
     default: "1"
     private: no
   tasks:
-    # GET all filesystem of the ZFS, by calling the API. Return code must be 200.
+    # GET all filesystem of the ZFS, by calling the API. Return code must be 200. 
     # This is used to fetch the latest share name and calculate the next one.
     # Nameconvention: share-01,02,03...12,13,14...
     - name: "Get all filesystems of Oracle ZFS"
@@ -47,19 +47,27 @@
     # remember the last returned array
     - name: "Store last share array"
       set_fact:
-        last_share: "{{ result.json.filesystems|last }}"
+        last_share: "{{ 'share-0' if result.json.filesystems is not defined else result.json.filesystems|last}}"
       register: last_share
 
     # recalculate the next share ID, by incrementing with 1. If array was empty, then next number is 1
     - name: "Get NEXT share ID"
-      set_fact:
-        last_share_name: "{{ last_share.name.split('-')[1]|int+1 if last_share.name|length > 0 else '1' }}"
-      register: last_share_name
+      block:
+        - name: check result json
+          set_fact:
+            last_share_name: "{{ last_share.name.split('-')[1]|int+1 if last_share.name|length > 0 else '1' }}"  
+          ignore_errors: yes
+          register: last_share_name
+      rescue:
+        - name: rescue me
+          set_fact:
+            last_share_name: "1"
+          register: last_share_name
 
     # put together and get the next sharename
-    - name: "Get NEXT sharename"
+    - name: "Get NEXT sharename" 
       set_fact:
-        next_share_name: "{{ 'share-0'+last_share_name if last_share_name < 10 else 'share-'+last_share_name }}"
+        next_share_name: "{{ 'share-0'+last_share_name if last_share_name|int < 10 else 'share-'+last_share_name }}"
       register: next_share_name
 
     # Create the filesystem at the OracleZFS. Return code is 201
