@@ -15,4 +15,4 @@ spec:
     path: /export/{{ next_share_name }}
     server: {{ oraclezfs_host }}
   persistentVolumeReclaimPolicy: Recycle
-  storageClassName: ''
+  storageClassName: '{{ storageclass }}'

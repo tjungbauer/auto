@@ -1,2 +1,5 @@
-[test]
+[nonprod]
 localhost
+
+[masters]
+tux1728-158

@@ -106,7 +106,7 @@
         src: templates/persistent-volume.yml.j2
       when: result | length > 0
       changed_when: False
-      delegate_to: "{{ master }}"
+      delegate_to: "{{ groups.masters.0 }}"
 
     # use "oc" command to create the actual PV in Openshift
     - name: "Create PersistentVolumes"
@@ -121,7 +121,34 @@
       when: result | length > 0
       failed_when: "('already exists' not in pv_create_output.stderr) and ('created' not in pv_create_output.stdout) and pv_create_output.rc != 0"
       changed_when: ('created' in pv_create_output.stdout)
-      delegate_to: "{{ master }}"
+      delegate_to: "{{ groups.masters.0 }}"
 
     - debug:
         msg: "PV {{ next_share_name }} has been created"
+
+    # use the template templates/persistent-volume-claim.yml.j2 to create and push a yaml file onto the master node
+    - name: "Create PersistentVolumeClaim definition"
+      template:
+        dest: "{{ 'PVC-'+next_share_name+'.yml' }}"
+        src: templates/persistent-volume-claim.yml.j2
+      when: result | length > 0
+      changed_when: False
+      delegate_to: "{{ groups.masters.0 }}"
+
+    # create PVC binding
+    - name: "Create PersistentVolumeClaim binding for {{ next_share_name }}"
+      become: true
+      become_user: root
+      become_method: sudo
+      command: >
+        oc create
+        -f "{{ 'PVC-'+next_share_name+'.yml' }}"
+        --config=/etc/origin/master/admin.kubeconfig
+      register: pv_create_output
+      when: result | length > 0
+      failed_when: "('already exists' not in pv_create_output.stderr) and ('created' not in pv_create_output.stdout) and pv_create_output.rc != 0"
+      changed_when: ('created' in pv_create_output.stdout)
+      delegate_to: "{{ groups.masters.0 }}"
+
+    - debug:
+        msg: "PVC {{ next_share_name }} has been created {{ groups.masters.0 }}"

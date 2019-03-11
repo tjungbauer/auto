@@ -1,3 +1,4 @@
 ---
 oraclezfs_url: "https://{{ oraclezfs_host }}:215"
 quota_gib: "{{ (quota_gb|int * 1024|pow(3)) }}" # calculate GB to GiB
+storageclass: "classic-nfs"
